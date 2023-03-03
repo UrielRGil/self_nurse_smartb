@@ -3,46 +3,60 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:self_nurse/blocs/ble_bloc/ble_bloc.dart';
 import 'package:self_nurse/widgets/widgets.dart';
 
-class HomePage extends StatelessWidget {
+import '../views/views.dart';
+
+class HomePage extends StatefulWidget {
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int currentIndex = 0;
+  final PageController _pageController = PageController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Self Nurse'),
-        actions: [Icon(Icons.wifi)],
+        actions: [
+          BlocBuilder<BleBloc, BleState>(
+            builder: (context, state) {
+              if (state.status == BleStatus.connected) {
+                return const ConnectionStatus(status: true);
+              }
+              return const ConnectionStatus(status: false);
+            },
+          ),
+        ],
       ),
-      body: BlocBuilder<BleBloc, BleState>(
-        builder: (context, state) {
-          if (state.scannerState.discoveredDevices.isEmpty &&
-              state.status == BleStatus.initial) {
-            return const EmptyListMessagge();
-          } else if (state.status == BleStatus.discovering) {
-            return Stack(
-              children: [
-                DevicesList(devices: state.scannerState.discoveredDevices),
-                const Center(child: CircularProgressIndicator())
-              ],
-            );
-          }
-
-          return DevicesList(devices: state.scannerState.discoveredDevices);
-        },
+      body: PageView(
+        controller: _pageController,
+        children: [
+          DeviceDataView(),
+          DevicesListView(),
+        ],
       ),
-      floatingActionButton: BlocBuilder<BleBloc, BleState>(
-        builder: (context, state) {
-          if (state.status == BleStatus.discovering) {
-            return FloatingActionButton(
-              onPressed: () {
-                context.read<BleBloc>().add(OnStopScanner());
-              },
-              child: const Icon(Icons.stop_rounded),
-            );
-          }
-          return FloatingActionButton(
-              onPressed: () {
-                context.read<BleBloc>().add(OnStartScanner());
-              },
-              child: const Icon(Icons.search_rounded));
+      bottomNavigationBar: BottomNavigationBar(
+        elevation: 0.0,
+        currentIndex: currentIndex,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search_rounded),
+            label: 'Search',
+          )
+        ],
+        onTap: (index) {
+          setState(() {
+            _pageController.animateToPage(index,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInCirc);
+            currentIndex = index;
+          });
         },
       ),
     );

@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:self_nurse/models/ble_scanner_state.dart';
+import 'package:self_nurse/services/ble_device_connector.dart';
 
 import '../../services/ble_scanner.dart';
 
@@ -11,9 +14,12 @@ part 'ble_state.dart';
 
 class BleBloc extends Bloc<BleEvent, BleState> {
   final BleScanner _bleScanner;
-  StreamSubscription<BleScannerState>? _subscription;
+  final BleDeviceConnector _bleConnector;
 
-  BleBloc(this._bleScanner)
+  StreamSubscription<BleScannerState>? _subscriptionScanner;
+  StreamSubscription<ConnectionStateUpdate>? _subscriptionConnector;
+
+  BleBloc(this._bleScanner, this._bleConnector)
       : super(const BleState(
             status: BleStatus.initial,
             scannerState: BleScannerState(
@@ -22,10 +28,31 @@ class BleBloc extends Bloc<BleEvent, BleState> {
     on<OnStartScanner>(_onStartScanner);
     on<OnStopScanner>(_onStopScanner);
     on<OnScannerStateChanged>(_onScannerStateChanged);
+    on<OnTryToConnectDevice>(_onTryToConnectDevice);
+    on<OnConnectDeviceChanged>(_onConnectDeviceChanged);
 
-    _subscription = _bleScanner.state.listen((scannerState) async {
+    _subscriptionScanner = _bleScanner.state.listen((scannerState) async {
       await _scannerStateChanged(scannerState);
     });
+
+    _subscriptionConnector = _bleConnector.state.listen((stateUpdate) async {
+      if (stateUpdate.connectionState == DeviceConnectionState.connected) {
+        add(OnConnectDeviceChanged(
+            deviceId: stateUpdate.deviceId, status: BleStatus.connected));
+      }
+    });
+  }
+
+  void _onTryToConnectDevice(
+      OnTryToConnectDevice event, Emitter<BleState> emit) async {
+    emit(state.copyWith(
+        status: BleStatus.connecting, selectedDevice: event.device));
+    await _bleConnector.connect(event.device.id);
+  }
+
+  void _onConnectDeviceChanged(
+      OnConnectDeviceChanged event, Emitter<BleState> emit) {
+    emit(state.copyWith(status: event.status));
   }
 
   Future<void> _scannerStateChanged(BleScannerState scannerState) async {
@@ -52,7 +79,7 @@ class BleBloc extends Bloc<BleEvent, BleState> {
 
   @override
   Future<void> close() {
-    _subscription?.cancel();
+    _subscriptionScanner?.cancel();
     return super.close();
   }
 }

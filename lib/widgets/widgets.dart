@@ -1,3 +1,5 @@
+export 'package:self_nurse/widgets/connection_status.dart';
+
 export 'package:self_nurse/widgets/device_list_tile.dart';
 
 export 'package:self_nurse/widgets/devices_list.dart';
